@@ -5,8 +5,6 @@ import spidev
 import time
 import threading
 
-app = Flask(__name__)
-
 # 핀 번호 나열
 buzzer_pin = 2
 trig = 3
@@ -30,15 +28,19 @@ p = GPIO.PWM(buzzer_pin, 100)
 p.start(0)
 p.ChangeDutyCycle(100)
 
+# Ultrasonic 센서의 크기
 globalDistance = None
 
 
+# Photo Resistor 센서에서 값 읽기
 def analog_read(channel):
     r = spi.xfer2([1, (8 + channel) << 4, 0])
     adc_out = ((r[1] & 3) << 8) + r[2]
     return adc_out
 
 
+# 백그라운드에서 Ultrasonic 센서에서
+# 값을 읽어. globalDistance에 저장하기
 def update_distance():
     global globalDistance
     while True:
@@ -62,15 +64,18 @@ def update_distance():
         time.sleep(0.2)
 
 
+app = Flask(__name__)
+
+# 브라우저에서 접속 시
 @app.route('/')
 def index():
     return render_template('index.html')
 
 
+# 브라우저에서 피아노 버튼을 눌렀거나 뗐을 때
 @app.route('/piano')
 def piano_event():
     is_pressed = True if str(request.args.get('press')) == 'true' else False
-    frequency = None
 
     if is_pressed:
         frequency = float(str(request.args.get('value')))
@@ -87,12 +92,16 @@ def piano_event():
     return 'success'
 
 
+# 브라우저에서 색 변경을 위해
+# Photo Resistor의 값을 읽어올 때
 @app.route('/color')
 def get_photo_resistor_value():
     reading = analog_read(2)
     voltage = reading * 3.3 / 1024
     return str(voltage)
 
+
+# 어플리케이션 가동 실행문
 t = threading.Thread(target=update_distance)
 t.start()
 app.run('0.0.0.0', 8080)
